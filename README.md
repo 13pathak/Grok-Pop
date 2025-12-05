@@ -2,7 +2,6 @@
 
 **Grok Pop** is a Chrome extension that provides a floating, persistent mini-interface for [Grok.com](https://grok.com), enabling you to chat with Grok from any tab without context switching.
 
-![Grok Pop Icon](icon.png)
 <img width="1921" height="1030" alt="image" src="https://github.com/user-attachments/assets/4a456e05-f86d-41f3-807e-9cce220ae854" />
 
 
