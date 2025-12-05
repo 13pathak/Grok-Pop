@@ -1,0 +1,48 @@
+.grok-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 450px;
+    height: 600px;
+    background-color: #1e1e1e;
+    /* Dark background similar to Perplexity/Grok */
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 999999;
+    border: 1px solid #333;
+}
+
+.grok-header {
+    height: 30px;
+    background: #222;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-bottom: 1px solid #333;
+    gap: 10px;
+}
+
+.grok-header button {
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.grok-header button:hover {
+    color: #fff;
+}
+
+iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: #000;
+}
