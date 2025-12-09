@@ -42,7 +42,8 @@ function forceSameSiteUnrestricted(cookie) {
         };
         chrome.cookies.set(newCookie, (setCookie) => {
             if (chrome.runtime.lastError) {
-                // suppress error, sometimes cookie cannot be set if session ended
+                // Log error for debugging, but don't throw (session may have ended)
+                console.warn('Grok Pop: Could not set cookie', cookie.name, chrome.runtime.lastError.message);
             }
         });
     }

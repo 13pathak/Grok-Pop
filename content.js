@@ -2,6 +2,7 @@ let host = null;
 let shadow = null;
 let container = null;
 let iframe = null;
+let listenersAttached = false;
 
 function createPopup() {
     // Check for existing host (auto-cleanup for reloads/duplicates)
@@ -60,22 +61,36 @@ function createPopup() {
     container.appendChild(iframe);
     shadow.appendChild(container);
 
+    // Guard against missing document.body (e.g., on about:blank or during early load)
+    if (!document.body) {
+        console.warn('Grok Pop: document.body not available');
+        return;
+    }
+
     document.body.appendChild(host);
 
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && host.style.display !== 'none') {
-            togglePopup(false);
-        }
-    });
+    // Attach global listeners only once to prevent accumulation
+    if (!listenersAttached) {
+        listenersAttached = true;
 
-    // Close when clicking outside
-    document.addEventListener('mousedown', (e) => {
-        // If popup is open, and the click target is NOT the host element (meaning it's on the main page)
-        if (host && host.style.display !== 'none' && container && container.style.opacity !== '0' && e.target !== host) {
-            togglePopup(false);
-        }
-    });
+        // Close on Escape - check container visibility, not host
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && container && container.style.display !== 'none' && container.style.opacity !== '0') {
+                togglePopup(false);
+            }
+        });
+
+        // Close when clicking outside - properly detect clicks inside shadow DOM
+        document.addEventListener('mousedown', (e) => {
+            if (!container || container.style.display === 'none' || container.style.opacity === '0') {
+                return; // Popup not visible, do nothing
+            }
+            // Check if click is inside the host element (which contains the shadow DOM)
+            if (host && !host.contains(e.target) && e.target !== host) {
+                togglePopup(false);
+            }
+        });
+    }
 }
 
 function togglePopup(forceState) {
