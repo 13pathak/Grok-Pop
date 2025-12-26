@@ -65,29 +65,6 @@ const INLINE_STYLES = `
     to { transform: rotate(360deg); }
 }
 
-.grok-header {
-    height: 30px;
-    flex-shrink: 0;
-    background: #222;
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    border-bottom: 1px solid #333;
-    gap: 10px;
-}
-
-.grok-header button {
-    background: transparent;
-    border: none;
-    color: #888;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.grok-header button:hover {
-    color: #fff;
-}
-
 iframe {
     width: 100%;
     height: 100%;
@@ -115,24 +92,6 @@ function createPopup() {
     container = document.createElement('div');
     container.className = 'grok-container';
     container.style.display = 'flex';
-
-    // Header bar
-    const header = document.createElement('div');
-    header.className = 'grok-header';
-
-    const backBtn = document.createElement('button');
-    backBtn.textContent = '← Back';
-    backBtn.onclick = () => {
-        try { iframe?.contentWindow?.history.back(); } catch (e) { console.warn("Cannot go back", e); }
-    };
-
-    const homeBtn = document.createElement('button');
-    homeBtn.textContent = '🏠 Home';
-    homeBtn.onclick = () => { if (iframe) iframe.src = 'https://grok.com'; };
-
-    header.appendChild(backBtn);
-    header.appendChild(homeBtn);
-    container.appendChild(header);
 
     // Create placeholder - NO IFRAME YET (saves ~130MB per tab!)
     const loadingPlaceholder = document.createElement('div');

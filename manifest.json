@@ -11,7 +11,6 @@
     "permissions": [
         "activeTab",
         "scripting",
-        "storage",
         "declarativeNetRequest",
         "cookies"
     ],
@@ -37,16 +36,6 @@
                 "content.js"
             ],
             "run_at": "document_end"
-        }
-    ],
-    "web_accessible_resources": [
-        {
-            "resources": [
-                "styles.css"
-            ],
-            "matches": [
-                "<all_urls>"
-            ]
         }
     ],
     "declarative_net_request": {

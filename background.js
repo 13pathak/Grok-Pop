@@ -9,10 +9,7 @@ async function sendToggleMessage(tabId) {
                 target: { tabId: tabId },
                 files: ['content.js']
             });
-            await chrome.scripting.insertCSS({
-                target: { tabId: tabId },
-                files: ['styles.css']
-            });
+            // CSS is now inlined in content.js, no need to inject separately
             // Now send the message
             await chrome.tabs.sendMessage(tabId, { action: "toggle_popup" });
         } catch (injectError) {
