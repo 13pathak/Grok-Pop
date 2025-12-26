@@ -1,0 +1,13 @@
+﻿git : error: src refspec master does not match 
+any
+At line:1 char:1
++ git push -u origin master *>&1 | Out-File 
+-FilePath push_output.txt - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (er 
+   ror: src refs...s not match any:String) [],  
+   RemoteException
+    + FullyQualifiedErrorId : NativeCommandErro 
+   r
+ 
+error: failed to push some refs to 'origin'

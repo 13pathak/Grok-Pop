@@ -1,12 +1,36 @@
+// Helper function to send message with fallback to inject content script
+async function sendToggleMessage(tabId) {
+    try {
+        await chrome.tabs.sendMessage(tabId, { action: "toggle_popup" });
+    } catch (error) {
+        // Content script not loaded - try to inject it first
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                files: ['content.js']
+            });
+            await chrome.scripting.insertCSS({
+                target: { tabId: tabId },
+                files: ['styles.css']
+            });
+            // Now send the message
+            await chrome.tabs.sendMessage(tabId, { action: "toggle_popup" });
+        } catch (injectError) {
+            // Can't inject on this page (chrome://, about:, etc.)
+            console.warn('Grok Pop: Cannot run on this page', injectError.message);
+        }
+    }
+}
+
 chrome.action.onClicked.addListener((tab) => {
-    chrome.tabs.sendMessage(tab.id, { action: "toggle_popup" });
+    sendToggleMessage(tab.id);
 });
 
 chrome.commands.onCommand.addListener((command) => {
     if (command === "toggle_popup") {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, { action: "toggle_popup" });
+                sendToggleMessage(tabs[0].id);
             }
         });
     }

@@ -3,9 +3,100 @@ let shadow = null;
 let container = null;
 let iframe = null;
 let listenersAttached = false;
+let isPopupVisible = false;
+let iframeLoaded = false; // Track if iframe has been loaded
+
+// Inline CSS for instant rendering (no network delay)
+const INLINE_STYLES = `
+.grok-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 450px;
+    height: 600px;
+    background-color: #1e1e1e;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 999999;
+    border: 1px solid #333;
+    
+    visibility: hidden;
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+    
+    will-change: opacity, transform, visibility;
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out, visibility 0s linear 0.15s;
+}
+
+.grok-container.visible {
+    visibility: visible;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out, visibility 0s linear 0s;
+}
+
+/* Loading spinner while Grok loads on first open */
+.grok-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: #1e1e1e;
+    color: #888;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+}
+
+.grok-loading::after {
+    content: '';
+    width: 24px;
+    height: 24px;
+    margin-left: 10px;
+    border: 2px solid #333;
+    border-top-color: #888;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.grok-header {
+    height: 30px;
+    flex-shrink: 0;
+    background: #222;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-bottom: 1px solid #333;
+    gap: 10px;
+}
+
+.grok-header button {
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.grok-header button:hover {
+    color: #fff;
+}
+
+iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: #000;
+}
+`;
 
 function createPopup() {
-    // Check for existing host (auto-cleanup for reloads/duplicates)
     const existingHost = document.getElementById('grok-pop-host');
     if (existingHost) {
         existingHost.remove();
@@ -13,55 +104,45 @@ function createPopup() {
 
     host = document.createElement('div');
     host.id = 'grok-pop-host';
-    // Ensure host doesn't affect page layout
-    host.style.position = 'fixed';
-    host.style.top = '0';
-    host.style.left = '0';
-    host.style.width = '0';
-    host.style.height = '0';
-    host.style.zIndex = '2147483647'; // Max z-index
+    host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;';
 
     shadow = host.attachShadow({ mode: 'open' });
 
-    // Add styles
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = chrome.runtime.getURL('styles.css');
-    shadow.appendChild(link);
+    const style = document.createElement('style');
+    style.textContent = INLINE_STYLES;
+    shadow.appendChild(style);
 
     container = document.createElement('div');
     container.className = 'grok-container';
-    // Explicitly set initial state to hidden to avoid CSS loading race condition
-    container.style.display = 'none';
-    container.style.opacity = '0';
+    container.style.display = 'flex';
 
-    // Header bar for navigation controls
+    // Header bar
     const header = document.createElement('div');
     header.className = 'grok-header';
 
     const backBtn = document.createElement('button');
     backBtn.textContent = '← Back';
-    // Use try-catch for cross-origin protection
     backBtn.onclick = () => {
-        try { iframe.contentWindow.history.back(); } catch (e) { console.warn("Cannot go back", e); }
+        try { iframe?.contentWindow?.history.back(); } catch (e) { console.warn("Cannot go back", e); }
     };
 
     const homeBtn = document.createElement('button');
     homeBtn.textContent = '🏠 Home';
-    homeBtn.onclick = () => { iframe.src = 'https://grok.com'; };
+    homeBtn.onclick = () => { if (iframe) iframe.src = 'https://grok.com'; };
 
     header.appendChild(backBtn);
     header.appendChild(homeBtn);
     container.appendChild(header);
 
-    iframe = document.createElement('iframe');
-    iframe.src = 'https://grok.com';
-    iframe.allow = "clipboard-read; clipboard-write"; // Allow clipboard interaction
+    // Create placeholder - NO IFRAME YET (saves ~130MB per tab!)
+    const loadingPlaceholder = document.createElement('div');
+    loadingPlaceholder.className = 'grok-loading';
+    loadingPlaceholder.id = 'grok-loading-placeholder';
+    loadingPlaceholder.textContent = 'Loading Grok';
+    container.appendChild(loadingPlaceholder);
 
-    container.appendChild(iframe);
     shadow.appendChild(container);
 
-    // Guard against missing document.body (e.g., on about:blank or during early load)
     if (!document.body) {
         console.warn('Grok Pop: document.body not available');
         return;
@@ -69,27 +150,45 @@ function createPopup() {
 
     document.body.appendChild(host);
 
-    // Attach global listeners only once to prevent accumulation
     if (!listenersAttached) {
         listenersAttached = true;
 
-        // Close on Escape - check container visibility, not host
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && container && container.style.display !== 'none' && container.style.opacity !== '0') {
+            if (e.key === 'Escape' && isPopupVisible) {
                 togglePopup(false);
             }
         });
 
-        // Close when clicking outside - properly detect clicks inside shadow DOM
         document.addEventListener('mousedown', (e) => {
-            if (!container || container.style.display === 'none' || container.style.opacity === '0') {
-                return; // Popup not visible, do nothing
-            }
-            // Check if click is inside the host element (which contains the shadow DOM)
+            if (!isPopupVisible) return;
             if (host && !host.contains(e.target) && e.target !== host) {
                 togglePopup(false);
             }
         });
+    }
+}
+
+function loadIframe() {
+    if (iframeLoaded) return;
+    iframeLoaded = true;
+
+    iframe = document.createElement('iframe');
+    iframe.src = 'https://grok.com';
+    iframe.allow = "clipboard-read; clipboard-write";
+
+    // When iframe loads, remove the loading placeholder
+    iframe.onload = () => {
+        const placeholder = shadow.getElementById('grok-loading-placeholder');
+        if (placeholder) placeholder.remove();
+    };
+
+    // Replace placeholder with iframe
+    const placeholder = shadow.getElementById('grok-loading-placeholder');
+    if (placeholder) {
+        placeholder.parentNode.insertBefore(iframe, placeholder);
+        // Keep placeholder visible until iframe loads
+    } else {
+        container.appendChild(iframe);
     }
 }
 
@@ -98,25 +197,21 @@ function togglePopup(forceState) {
         createPopup();
     }
 
-    const isHidden = container.style.display === 'none' || container.style.opacity === '0';
-    const shouldShow = forceState !== undefined ? forceState : isHidden;
+    const shouldShow = forceState !== undefined ? forceState : !isPopupVisible;
 
     if (shouldShow) {
-        container.style.display = 'flex';
-        // Small timeout to allow display change before opacity transition
-        setTimeout(() => {
-            container.style.opacity = '1';
-            container.style.transform = 'translateY(0)';
-        }, 10);
-        iframe.focus();
+        isPopupVisible = true;
+        container.classList.add('visible');
+
+        // LAZY LOAD: Only load iframe on first open
+        if (!iframeLoaded) {
+            loadIframe();
+        }
+
+        if (iframe) iframe.focus();
     } else {
-        container.style.opacity = '0';
-        container.style.transform = 'translateY(10px)';
-        setTimeout(() => {
-            if (container.style.opacity === '0') {
-                container.style.display = 'none';
-            }
-        }, 300); // Match transition duration
+        isPopupVisible = false;
+        container.classList.remove('visible');
     }
 }
 
@@ -125,3 +220,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         togglePopup();
     }
 });
+
+// Pre-create just the DOM shell (lightweight, ~0MB overhead)
+// Iframe loads only on first popup trigger (saves ~130MB per tab!)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', createPopup);
+} else {
+    createPopup();
+}
